@@ -1,0 +1,13 @@
+clear;
+K=4;
+N=16;
+x_k=randn(N,K);
+X_k=fft(x_k);
+X=prod(X_k(:,1:(K-1)),2);
+A=log(X_k);
+b=log(X);
+z_=A\b;
+r=b-A*z_;
+b_=A*z_+r;
+X_=exp(b_);
+x_=ifft(X_);

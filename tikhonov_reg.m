@@ -1,0 +1,14 @@
+filename='~/Documents/sound/logic-samples/yamaha_grand_piano_mono/047_ped_s_mono.wav';
+x=wavread(filename);
+N=4096;
+x=x(1:N,1);
+G=diag(-1*ones(1,N))+diag(ones(1,N-1),1);
+G(end:end)=0;
+P=5;
+A=(1:N);
+A=A(:);
+A=A.^fliplr((0:P));
+X=abs(fft(x));
+%b=linsolve(A'*A + G'*G,A'*X);
+b=linsolve(A'*A,A'*X);
+plot(1:length(X),X,1:length(X),polyval(b,1:length(X)));
