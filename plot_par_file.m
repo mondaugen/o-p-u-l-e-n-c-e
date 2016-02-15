@@ -1,13 +1,13 @@
-function []=plot_par_file(par_path,thresh=0.1);
+function []=plot_par_file(par_path,fig_num=1);
 % PLOT_PAR_CXN_FILES
 %
 % par_path - path to partials file
-% cxn_path - path to connections file
-% thresh   - if a connection weight is over this value, plot it.
+% fig_num  - the number of figure to plot in
 %
 L_PARTIAL_RECORD=4;
 f=fopen(par_path,'r');
-figure 1;
+newplot(figure(fig_num));
+figure(fig_num);
 hold on;
 data=[];
 lastData=[];

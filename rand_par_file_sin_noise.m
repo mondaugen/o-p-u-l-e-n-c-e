@@ -29,16 +29,27 @@ L_PARTIAL_RECORD=4;
 data=[];
 lastData=[];
 f=fopen(sprintf(path,'par'),'w');
+fnoise=fopen(sprintf(path,'par_noise'),'w');
+fsig=fopen(sprintf(path,'par_sig'),'w');
 start_freqs=sort(rand(p,1));
 time=0;
 for k=1:N
     % First two are amp, freq, rest are damp, dfreq
     dfreq=ones(p,1)*fmodamp*fmodfreq*2*pi*dtime*cos(fmodfreq*2*pi*time);
     dfreq+=randn(p,1)*sigma;
-    data=[rand(p,1) start_freqs randn(p,1) dfreq];
+    sig_data=[rand(p,1) start_freqs randn(p,1) dfreq];
     noise_p=randi([min_noise_p max_noise_p],1);
-    data=[data;
-          rand(noise_p,2) randn(noise_p,2)];
+    noise_data=[unifrnd(-fmodamp,1+fmodamp,[noise_p,2]) randn(noise_p,2)];
+    len_sig=p*L_PARTIAL_RECORD;
+    len_noise=noise_p*L_PARTIAL_RECORD;
+    fwrite(fsig,dtime,'double');
+    fwrite(fsig,len_sig,'uint32');
+    fwrite(fsig,sig_data,'double');
+    fwrite(fnoise,dtime,'double');
+    fwrite(fnoise,len_noise,'uint32');
+    fwrite(fnoise,noise_data,'double');
+    data=[sig_data;
+          noise_data];
     start_freqs+=dfreq;
     time+=dtime;
     fwrite(f,dtime,'double');
@@ -55,3 +66,5 @@ for k=1:N
     lastData=data;
 end
 fclose(f);
+fclose(fsig);
+fclose(fnoise);

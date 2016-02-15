@@ -1,4 +1,4 @@
-function [costs]=par_cxn_lp_a(par_path,cxn_path,a='>=1',lamb=0)
+function [costs]=par_cxn_lp_a(par_path,cxn_path,a='>=1',lamb=0,mu=1)
     % PAR_CXN_LP
     %
     % Solve partial connections via linear programming
@@ -10,6 +10,11 @@ function [costs]=par_cxn_lp_a(par_path,cxn_path,a='>=1',lamb=0)
     %            '<=1' : if unequal number of in-partials and out-partials,
     %                    allow partials with no connections
     % lamb     - weight of last costs incorporated (should be between 0 and 1)
+    %            dampen discount of having similar last cost. lamb = 1 means
+    %            having cost equal to last cost, multiplies current cost by 0,
+    %            lamb = 0 means there's no benefit to having a similar last cost
+    % mu       - if cost is greater than this value, consider connection as
+    %            erroneous
     
     % Weight vector for amp,freq,damp,dfreq costs resp.
     L_PARTIAL_RECORD=4;
@@ -31,27 +36,22 @@ function [costs]=par_cxn_lp_a(par_path,cxn_path,a='>=1',lamb=0)
         end
         data=fread(f,ndata,'double');
         data=reshape(data,[length(data)/L_PARTIAL_RECORD,L_PARTIAL_RECORD]);
+        % use only frequency data
+        data=data(:,2);
         if (length(lastData)==0)
             lastData=data;
             continue;
         end
         m=size(data,1);
         n=size(lastData,1);
-        C=zeros(m,n);
-        for i=1:m
-            for j=1:n
-                C(i,j)=[divergence(lastData(j,1),data(i,1)),...
-                        divergence(lastData(j,2),data(i,2)),...
-                        divergence(lastData(j,3),data(i,3)),...
-                        divergence(lastData(j,4),data(i,4))]*w;
-            end
-        end
+%        C=zeros(m,n);
+        C=pt_build_cost_matrix(lastData(:),data(:),@divergence);
         if (length(lastCosts)==0)
-            lastCosts=zeros(1,n);
+            lastCosts=ones(1,n);
         end
-        % if lamb 0, C, multiplied by 1, if lamb 1, multiplied by ratio in
-        % lastCosts
-        C.*=(lastCosts.^(lamb));
+        disc=(1 - lamb*exp(-(log(C./(ones(m,1)*lastCosts)).^2)));
+        C=C.*disc;
+        %C.*=(lastCosts.^(lamb));
         costs{k}=C;
         k+=1;
         % Transpose because we want to stack rows into a column
@@ -151,13 +151,18 @@ function [costs]=par_cxn_lp_a(par_path,cxn_path,a='>=1',lamb=0)
                                       vartype);
         fmin;
         errnum
-        lastCosts=sum(C'.*reshape(xopt,[n,m])',2);
-        lastCosts=lastCosts';
-        lcsum=sum(lastCosts);
-        lastCosts/=lcsum;
+%        xopt_out=(C' < mu).*reshape(xopt,[n,m])';
+        % omitted bad costs still influence next costs
+        lastCosts=sum(C'.*reshape(xopt,[n,m])',2)';
+        %small=1e-10;
+        %lastCosts=lastCosts'+small;
+        %lcsum=sum(lastCosts);
+        %lastCosts/=lcsum;
         % Output file is <uint32_t> number of rows m
         %                <uint32_t> number of columns n
         %                <double * m * n> x vector as solution for optimal weights
+%        xopt_out=xopt_out';
+%        xopt_out=xopt_out(:);
         fwrite(g,m,'uint32');
         fwrite(g,n,'uint32');
         fwrite(g,xopt,'double');
@@ -170,5 +175,5 @@ end
 function [d]=divergence(x,y)
     %d=exp(abs(log(x) - log(y)));
     %d=(log(x)-log(y))^2;
-    d=(x-y)^2;
+    d=(x.-y).^2;
 end

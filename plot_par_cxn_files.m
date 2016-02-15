@@ -8,6 +8,7 @@ function [cxns]=plot_par_cxn_files(par_path,cxn_path,thresh=0.1,fig_num=1);
 L_PARTIAL_RECORD=4;
 f=fopen(par_path,'r');
 g=fopen(cxn_path,'r');
+newplot(figure(fig_num));
 figure(fig_num);
 hold on;
 data=[];
