@@ -1,23 +1,33 @@
-function [costs]=par_cxn_lp_a(par_path,cxn_path,a='>=1',lamb=0,mu=1)
-    % PAR_CXN_LP_A
+function [costs]=par_cxn_lp_a(par_path,
+                              cxn_path,
+                              alpha=0.5,
+                              beta=0.5,
+                              p=2,
+                              lamb=0.95,
+                              mu=1)
+    % PAR_CXN_LP_B
     %
     % Solve partial connections via linear programming
+    % A linear prediction of the next node is incorporated into the cost function.
+    %
     % par_path - path to file containing partials
     % cxn_path - path to file where connections will be saved
-    % a        - adaptation method:
-    %            '>=1' : if unequal number of in-partials and out-partials,
-    %                    allow partials with multiple connections
-    %            '<=1' : if unequal number of in-partials and out-partials,
-    %                    allow partials with no connections
-    % lamb     - weight of last costs incorporated (should be between 0 and 1)
-    %            dampen discount of having similar last difference. lamb = 1
-    %            means having difference equal to last difference, multiplies
-    %            current cost by 0, lamb = 0 means there's no benefit to having
-    %            a similar last difference 
+    % alpha    - influence of difference between current node and next node in
+    %            cost function
+    % beta     - influence of difference between current prediction of next node
+    %            and next node in cost function
+    % p        - order of predictor
+    % lamb     - forgetting factor for RLS linear predictor
     % mu       - if cost is greater than this value, consider connection as
     %            erroneous
+    %
+    % NOTE: alpha and beta best add up to 1
+    % the only mode available is
+    %            a = '<=1' : if unequal number of in-partials and out-partials,
+    %                    allow partials with no connections
     
     % Weight vector for amp,freq,damp,dfreq costs resp.
+    a='<=1';
     L_PARTIAL_RECORD=4;
     w=[0;1;0;0];
     lastData=[];
