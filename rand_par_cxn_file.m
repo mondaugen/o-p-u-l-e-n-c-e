@@ -23,7 +23,7 @@ g=fopen(sprintf(path,'cxn'),'w');
 for k=1:N
     p=randi([pmin,pmax],1);
     % First two are amp, freq, rest are damp, dfreq
-    data=[rand(p,1) sort(rand(p,1)) randn(p,2)];
+    data=[rand(p,1) rand(p,1) randn(p,2)];
     fwrite(f,dtime,'double');
     len_=p*L_PARTIAL_RECORD;
     fwrite(f,len_,'uint32');

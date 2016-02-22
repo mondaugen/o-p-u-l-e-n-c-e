@@ -1,4 +1,4 @@
-function [costs]=par_cxn_lp_a(par_path,
+function [costs,errnums]=par_cxn_lp_b(par_path,
                               cxn_path,
                               alpha=0.5,
                               beta=0.5,
@@ -30,44 +30,66 @@ function [costs]=par_cxn_lp_a(par_path,
     a='<=1';
     L_PARTIAL_RECORD=4;
     w=[0;1;0;0];
-    lastData=[];
+    data_k0={};
     f=fopen(par_path,'r');
     g=fopen(cxn_path,'w');
     costs={};
     k=1;
-    lastCosts=[];
-    lastD=[];
+    costs_k0=[];
+    D_k0=[];
+    % RLS initializer
+    delta=0.0001;
     while ~feof(f)
         dtime=fread(f,1,'double');
         if(length(dtime)==0)
             break;
         end
-        ndata=fread(f,1,'uint32');
-        if(length(ndata)==0)
+        ndata_k1=fread(f,1,'uint32');
+        if(length(ndata_k1)==0)
             break;
         end
-        data=fread(f,ndata,'double');
-        data=reshape(data,[length(data)/L_PARTIAL_RECORD,L_PARTIAL_RECORD]);
-        % use only frequency data
-        data=data(:,2);
-        if (length(lastData)==0)
-            lastData=data;
+        data_k1=fread(f,ndata_k1,'double');
+        data_k1=reshape(data_k1,[length(data_k1)/L_PARTIAL_RECORD,L_PARTIAL_RECORD]);
+        % use only frequency data_k1
+        data_k1=data_k1(:,2);
+        m=size(data_k1,1);
+        if (length(data_k0)==0)
+            % There are no data for paths to come from, initialize and continue
+            % again from the top of the loop
+            data_k0=cell(m,1);
+            W_k0=cell(m,1);
+            P_k0=cell(m,1);
+            for m_=1:m    
+                data_k0{m_}=[data_k1(m_);zeros(p-1,1)];
+                W_k0{m_}=[1;zeros(p-1,1)];
+                P_k0{m_}=eye(p)/delta;
+            end
             continue;
         end
-        m=size(data,1);
-        n=size(lastData,1);
-%        C=zeros(m,n);
-        C=pt_build_cost_matrix(lastData(:),data(:),@divergence);
-        D=pt_build_cost_matrix(lastData(:),data(:),@difference);
-        if (length(lastCosts)==0)
-            lastCosts=zeros(1,n);
+        n=size(data_k0,1);
+        W_k1=cell(m,n);
+        P_k1=cell(m,n);
+        E=zeros(m,n);
+        data_k0_=zeros(n,1);
+        for n_=1:n
+            data_k0_(n_)=data_k0{n_}(1);
+            for m_=1:m
+                [W_k1{m_,n_},P_k1{m_,n_},E(m_,n_)]=rls_1(data_k1(m_),
+                                                         data_k0{n_},
+                                                         W_k0{n_},
+                                                         P_k0{n_},
+                                                         lamb);
+            end
         end
-        if (length(lastD)==0)
-            lastD=zeros(1,n);
+        C1=pt_build_cost_matrix(data_k0_(:),data_k1(:),@divergence);
+        C=alpha*C1+beta*abs(E);
+        D=pt_build_cost_matrix(data_k0_(:),data_k1(:),@difference);
+        if (length(costs_k0)==0)
+            costs_k0=zeros(1,n);
         end
-        disc=(1 - lamb*exp(-(D.-(ones(m,1)*lastD).^2)));
-        C=C.*disc;
-        %C.*=(lastCosts.^(lamb));
+        if (length(D_k0)==0)
+            D_k0=zeros(1,n);
+        end
         costs{k}=C;
         k+=1;
         % Transpose because we want to stack rows into a column
@@ -166,25 +188,39 @@ function [costs]=par_cxn_lp_a(par_path,
                                       ctype,...
                                       vartype);
         fmin;
-        errnum
-        xopt_out=(abs(D) < mu).*reshape(xopt,[n,m])';
-        % omitted bad costs still influence next costs
-        lastCosts=sum(C'.*reshape(xopt,[n,m])',2)';
-        lastD=sum(D.*reshape(xopt,[n,m])',2)';
+        errnums{k}=errnum;
+        X=(abs(D) < mu).*reshape(xopt,[n,m])';
+        W_k0=cell(m,1);
+        data_k0_new=cell(m,1);
+        data_k0;
+        for m_=1:m
+            if any(X(m_,:) > 0)
+                n_=find(X(m_,:) > 0)(1);
+                W_k0{m_}=W_k1{m_,n_};
+                P_k0{m_}=P_k1{m_,n_};
+                data_k0_new{m_}=[data_k1(m_);data_k0{n_}(1:(p-1),:)];
+            else
+                W_k0{m_}=[1;zeros(p-1,1)];
+                P_k0{m_}=eye(p)./delta;
+                data_k0_new{m_}=[data_k1(m_);zeros(p-1,1)];
+            end
+        end
+        data_k0=data_k0_new;
+        costs_k0=sum(C'.*X,2)';
+        D_k0=sum(D.*X,2)';
         %small=1e-10;
-        %lastCosts=lastCosts'+small;
-        %lcsum=sum(lastCosts);
-        %lastCosts/=lcsum;
+        %costs_k0=costs_k0'+small;
+        %lcsum=sum(costs_k0);
+        %costs_k0/=lcsum;
         % Output file is <uint32_t> number of rows m
         %                <uint32_t> number of columns n
         %                <double * m * n> x vector as solution for optimal weights
-        xopt_out=xopt_out';
+        xopt_out=X';
         xopt_out=xopt_out(:);
         fwrite(g,m,'uint32');
         fwrite(g,n,'uint32');
 %        fwrite(g,xopt,'double');
         fwrite(g,xopt_out,'double');
-        lastData=data;
     end
     fclose(f);
     fclose(g);

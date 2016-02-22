@@ -36,7 +36,8 @@ function [costs]=par_cxn_mq(par_path,cxn_path,mu)
         n=size(lastData,1);
         C=pt_build_cost_matrix(lastData(:),data(:),@divergence);
         k+=1;
-        xopt=pt_mq_cxns(C,mu);
+        % make sure mu is compatible with divergence
+        xopt=pt_mq_cxns(C,divergence(mu,0));
         xopt=xopt';
         xopt=xopt(:);
         fwrite(g,m,'uint32');

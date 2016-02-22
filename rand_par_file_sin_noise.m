@@ -32,10 +32,11 @@ f=fopen(sprintf(path,'par'),'w');
 fnoise=fopen(sprintf(path,'par_noise'),'w');
 fsig=fopen(sprintf(path,'par_sig'),'w');
 start_freqs=sort(rand(p,1));
+phs=rand(1)*2*pi;
 time=0;
 for k=1:N
     % First two are amp, freq, rest are damp, dfreq
-    dfreq=ones(p,1)*fmodamp*fmodfreq*2*pi*dtime*cos(fmodfreq*2*pi*time);
+    dfreq=ones(p,1)*fmodamp*fmodfreq*2*pi*dtime*cos(fmodfreq*2*pi*time+phs);
     dfreq+=randn(p,1)*sigma;
     sig_data=[rand(p,1) start_freqs randn(p,1) dfreq];
     noise_p=randi([min_noise_p max_noise_p],1);

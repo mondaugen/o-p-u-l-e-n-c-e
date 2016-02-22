@@ -7,7 +7,6 @@ function [X] = pt_mq_cxns(C,mu)
 % indices are set to 0. Let there be L such entries.
 % X is a matrix containing K=min(M,N)-L entries set to 1, the rest 0.
 % X(i,j) corresponds to kth smallest value of c where i=c(j), i != 0
-% THIS IS NOT CORRECT YET
 [M,N]=size(C);
 K=min([M N]);
 X=zeros(M,N);
