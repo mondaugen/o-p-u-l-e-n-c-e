@@ -1,7 +1,13 @@
-function [z,ep_]=bpdn(A,b,la,maxiter=100,ep=1e-3,mu=1.1)
-    % BPDN
+function [z,ep_]=bpdn_fft(res,b,la,maxiter=100,ep=1e-3,mu=1.1)
+    % BPDN_FFT
     %
-    % Basis pursuit denoising.
+    % Basis pursuit denoising optimized for fourier dictionary.
+    %
+    % res is the resolution of the dictionary 1 is normal fourier dictionary, 2
+    % double resolution etc. 
+    %
+    % res and length of b should be powers of 2
+    %
     % Solve the optimization problem
     % min ||A*x - b||_2 + la*u
     % s.t. -u < x < u
@@ -16,6 +22,13 @@ function [z,ep_]=bpdn(A,b,la,maxiter=100,ep=1e-3,mu=1.1)
     % ep_ is suboptimality of solution (useful to judge number of iterations)
     DEBUG=0;
 
+    M=length(b);
+    res=4;
+    L=M*res;
+    m=(0:(M-1));
+    k_real=(0:(L/2));
+    k_imag=(1:(L/2-1));
+    A=[cos(-2*pi*m'/L*k_real) sin(-2*pi*m'/L*k_imag)];
     [M,N]=size(A);
     % choose arbitrary x, make feasible u
     x=zeros(N,1);
@@ -26,6 +39,9 @@ function [z,ep_]=bpdn(A,b,la,maxiter=100,ep=1e-3,mu=1.1)
     t=mu*M/(norm(A*x-b)+la*norm(x,1));
     al=0.15;
     be=0.8;
+    Atb=fft(b,N);
+    Atb=[real(Atb(k_real+1));
+         imag(Atb(k_imag+1))];
 
     fopts{1}=t;
 
@@ -50,7 +66,10 @@ function [z,ep_]=bpdn(A,b,la,maxiter=100,ep=1e-3,mu=1.1)
         x=z(1:N);
         u=z(N+1:2*N);
         p=A*x;
-        p=t*(x'*A'*p-2*b'*p+b'*b+la*sum(u));
+        Atp=fft(p,N);
+        Atp=[real(Atp(k_real+1));
+             imag(Atp(k_imag+1))];
+        p=t*(x'*Atp-2*b'*p+b'*b+la*sum(u));
         p=p-sum(log(u-x))-sum(log(x+u))-sum(log(u));
     end
 
@@ -93,7 +112,10 @@ function [z,ep_]=bpdn(A,b,la,maxiter=100,ep=1e-3,mu=1.1)
             D_i=(D1+D2+D3)^(-1);
 %            D=(1/(2*t))*(D1+D2-(D2-D1)*(D1+D2+D3)^(-1)*(D2-D1));
             D=(1/(2*t))*(D1+D2-(D2-D1)*D_i*(D2-D1));
-            g1=-t*(2*A'*(A*x)-2*A'*b)-d1+d2;
+            AtAx=fft(A*x,N);
+            AtAx=[real(AtAx(k_real+1));
+                  imag(AtAx(k_imag+1))];
+            g1=-t*2*(AtAx-Atb)-d1+d2;
             g2=t*la*ones(N,1)-d1-d2-d3;
 %            rhs=-t*(2*A'*(A*x)-2*A'*b);
 %            rhs=rhs-d1+d2+(D2-D1)*(D1+D2+D3)^(-1)*(t*la*ones(N,1)-d1-d2-d3);
@@ -105,7 +127,10 @@ function [z,ep_]=bpdn(A,b,la,maxiter=100,ep=1e-3,mu=1.1)
             v=linsolve(R,...
                 linsolve(R',A*D^(-1)*r,struct('LT','true')),...
                 struct('UT','true'));
-            dx=D^(-1)*(r-A'*v);
+            v_=fft(v,N);
+            v_=[real(v_(k_real+1));
+                imag(v_(k_imag+1))];
+            dx=D^(-1)*(r-v_);
 %            du=(D1+D2+D3)^(-1)*(-t*la*ones(N,1)+d1+d2+d3-(D2-D1)*dx);
             du=D_i*(-g2-(D2-D1)*dx);
 %            gf=[t*(2*A'*(A*x)-2*A'*b)+d1-d2;t*la*ones(N,1)-d1-d2-d3];
